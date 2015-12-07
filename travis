@@ -1,0 +1,39 @@
+#!/usr/bin/env ruby
+
+require 'octokit'
+
+token = ENV['GITHUB_TOKEN']
+client = Octokit::Client.new(:access_token => token)
+
+def list_hooks(repo)
+  last_response = repo.rels[:hooks].get
+  loop do
+    hooks = last_response.data
+    if hooks.any? {|h|h.name == 'travis' }
+      puts repo.full_name
+    end
+    break if last_response.rels[:next].nil?
+    last_response = last_response.rels[:next].get
+  end
+end
+
+def crawl_repos(user)
+  last_response = user.rels[:repos].get
+  loop do
+    repos = last_response.data
+    repos.each {|r| list_hooks r }
+    break if last_response.rels[:next].nil?
+    last_response = last_response.rels[:next].get
+  end
+end
+
+orgs = %w(
+  lsst
+  lsst-dm
+  lsst-sqre
+)
+
+orgs.each do |u|
+  user = client.user u
+  crawl_repos user
+end
